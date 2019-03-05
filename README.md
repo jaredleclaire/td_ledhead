@@ -15,8 +15,7 @@ In addition to grids this tool also provides basic information about the size an
 Planned features:
 
 Current
--product database (pull from AT?)
--SOP generation
+-product database (pull from AT?) & SOP generation
 
 Near
 -method to place half tiles on specific row/column
