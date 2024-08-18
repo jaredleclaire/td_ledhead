@@ -42,8 +42,7 @@ class LedheadExt:
 	def setDesignRes(self, tile_res_x, tile_res_y):
 		return
 	
-	# promoted extensions
-
+	# PROMOTED EXTENSIONS
 	# checks which maps are toggled for output and saves them to the specified directory
 	def SavePatterns(self):
 		outputNative = op('null_pars')['Outputnative']
@@ -93,14 +92,50 @@ class LedheadExt:
 		p = ui.panes.createFloating(type=PaneType.NETWORKEDITOR, name="Output")
 		p.owner = op('container1/button1')
 
+	# sets mode for setting design scale resolution
 	def SetScalingMode(self, mode):
 
-		parent.Ledhead.par.Scalingmode = mode
+		if mode == 'density':
+			# set parameter enable state
+			parent.Ledhead.par.Densityunit.enable = True
+			parent.Ledhead.par.Targetdensity.enable = True
+			parent.Ledhead.parGroup.Manualresolution.enable = False
+			parent.Ledhead.par.Scalefactor.enable = False
+		
+		elif mode == 'manual':
+			# set parameter enable state
+			parent.Ledhead.par.Densityunit.enable = False
+			parent.Ledhead.par.Targetdensity.enable = False
+			parent.Ledhead.parGroup.Manualresolution.enable = True
+			parent.Ledhead.par.Scalefactor.enable = False
+
+			'''
+			# initialize resolution to same as native resolution
+			screen_res_w = int(parent.Ledhead.par.Screenresolutionw)
+			screen_res_h = int(parent.Ledhead.par.Screenresolutionh)
+
+			parent.Ledhead.parGroup.Manualdesignresolution = (screen_res_w, screen_res_h)
+			'''
+		
+		elif mode == 'factor':
+			# set parameter enable state
+			parent.Ledhead.par.Densityunit.enable = False
+			parent.Ledhead.par.Targetdensity.enable = False
+			parent.Ledhead.parGroup.Manualresolution.enable = False
+			parent.Ledhead.par.Scalefactor.enable = True
+		
+		elif mode == 'bypass':
+			# set parameter enable state
+			parent.Ledhead.par.Densityunit.enable = False
+			parent.Ledhead.par.Targetdensity.enable = False
+			parent.Ledhead.parGroup.Manualresolution.enable = False
+			parent.Ledhead.par.Scalefactor.enable = False
+		
+		else:
+			pass
 
 	# re-generates screen pattern
 	def Reinit(self):
 
 		op('container1/replicator1').par.recreateall.pulse()
 		op('replicator1').par.recreateall.pulse()
-
-	
