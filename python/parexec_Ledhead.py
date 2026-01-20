@@ -13,6 +13,8 @@ def onValueChange(par, prev):
 			# Trigger scaling mode calculation when any scaling-related parameter changes
 			scaling_mode = str(parent.Ledhead.par.Scalingmode).lower()
 			parent.Ledhead.ApplyScalingMode(scaling_mode)
+		case 'Tilesw' | 'Tilesh' | 'Tileresolutionw' | 'Tileresolutionh' | 'Tilesizemmw' | 'Tilesizemmh':
+			parent.Ledhead.UpdateDerivedProperties()
 		case _:
 			pass
 	
@@ -21,9 +23,14 @@ def onValueChange(par, prev):
 # Called at end of frame with complete list of individual parameter changes.
 # The changes are a list of named tuples, where each tuple is (Par, previous value)
 def onValuesChanged(changes):
+	for c in changes:
+		# use par.eval() to get current value
+		par = c.par
+		prev = c.prev
 	return
 
 def onPulse(par):
+
 	match par.name:
 		case 'Edittile':
 			parent.Ledhead.EditTile()
@@ -31,7 +38,9 @@ def onPulse(par):
 			parent.Ledhead.Reinit()
 		case 'Savepatterns':
 			parent.Ledhead.SavePatterns()
-	
+		case _:
+			pass
+
 	return
 
 def onExpressionChange(par, val, prev):
