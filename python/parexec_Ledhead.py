@@ -8,10 +8,9 @@
 def onValueChange(par, prev):
 	# use par.eval() to get current value
 	
-	if par.name == 'Scalingmode':
-		parent.Ledhead.SetScalingMode(par)
-	else:
-		pass
+	match par.name:
+		case _:
+			pass
 	
 	return
 
@@ -25,6 +24,17 @@ def onValuesChanged(changes):
 	return
 
 def onPulse(par):
+
+	match par.name:
+		case 'Edittile':
+			parent.Ledhead.EditTile()
+		case 'Reinit':
+			parent.Ledhead.Reinit()
+		case 'Savepatterns':
+			parent.Ledhead.SavePatterns()
+		case _:
+			pass
+
 	return
 
 def onExpressionChange(par, val, prev):
