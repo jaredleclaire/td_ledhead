@@ -149,7 +149,7 @@ class LedheadExt:
 			else:
 				native_ppi = 0.0
 			
-			parent.Ledhead.par.Nativepixeldensity = native_ppi
+			parent.Ledhead.par.Nativepixeldensity = str(native_ppi) + ' PPI'
 			
 			# Calculate total tile count
 			tile_count = tiles_w * tiles_h
