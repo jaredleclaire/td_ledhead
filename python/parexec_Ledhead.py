@@ -12,7 +12,7 @@ def onValueChange(par, prev):
 		case 'Scalingmode' | 'Screenresolutionw' | 'Screenresolutionh' | 'Densityunit' | 'Targetdensity':
 			# Trigger scaling mode calculation when any scaling-related parameter changes
 			scaling_mode = str(parent.Ledhead.par.Scalingmode).lower()
-			parent.Ledhead.ApplyScalingMode(scaling_mode)
+			parent.Ledhead.ApplyScalingMode(scaling_mode,verbose=False)
 		case 'Tilesw' | 'Tilesh' | 'Tileresolutionw' | 'Tileresolutionh' | 'Tilesizemmw' | 'Tilesizemmh':
 			parent.Ledhead.UpdateDerivedProperties()
 		case _:

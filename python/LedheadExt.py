@@ -1,23 +1,60 @@
 """
-Extension classes enhance TouchDesigner components with python. An
-extension is accessed via ext.ExtensionClassName from any operator
-within the extended component. If the extension is promoted via its
-Promote Extension parameter, all its attributes with capitalized names
-can be accessed externally, e.g. op('yourComp').PromotedFunction().
+Ledhead Extension Module
 
-Help: search "Extensions" in wiki
+Provides LED screen configuration, scaling, and pattern management for TouchDesigner.
+Handles multiple resolution scaling modes, calculates screen properties (aspect ratio,
+physical dimensions, pixel density), and manages pattern export and visualization.
+
+Access via: parent.Ledhead.ext (if promoted) or op('ledhead_component').ext
+
+API OVERVIEW:
+=============
+
+Scaling Modes:
+  - density: Calculate design resolution from pixel density and physical screen size
+  - manual: Use manually specified design resolution values
+  - factor: Scale native resolution by a multiplication factor
+  - bypass: Use native resolution without scaling
+
+Custom Component Parameters (automatically calculated and updated):
+  - Screenresolution: Native screen resolution in pixels
+  - Screendesignresolution: Scaled design resolution in pixels
+  - Screenaspectratio: Screen aspect ratio as formatted string (e.g., "1.78:1")
+  - Screensizem: Physical screen dimensions in meters
+  - Screensizeft: Physical screen dimensions in feet
+  - Nativepixeldensity: Screen pixel density in PPI (pixels per inch)
+  - Tilecount: Total number of tiles
+
+Main Methods:
+  - ApplyScalingMode(mode, verbose=True, round_to_even=False, preserve_aspect=False)
+  - UpdateDerivedProperties()
+  - SavePatterns()
+  - SetColor(r, g, b)
+  - Reinit()
+  - EditTile()
+
+Example Usage:
+  # Apply scaling with aspect ratio preservation
+  parent.Ledhead.ext.ApplyScalingMode('density', preserve_aspect=True, round_to_even=True)
+  
+  # Set color scheme
+  parent.Ledhead.ext.SetColor(1.0, 0.5, 0.2)
+  
+  # Regenerate tiles
+  parent.Ledhead.ext.Reinit()
 """
-
-from TDStoreTools import StorageManager
-import TDFunctions as TDF
 
 class LedheadExt:
 	"""
-	LedheadExt provides LED screen configuration and pattern management for TouchDesigner.
+	Ledhead LED Screen Extension.
 	
-	Supports multiple scaling modes to convert native screen resolution to design resolution,
-	calculates derived properties like aspect ratio and pixel density, and manages pattern
-	export and visualization.
+	Manages LED screen configuration with support for:
+	- Multiple resolution scaling modes (density-based, manual, factor-based, bypass)
+	- Automatic derived property calculation (aspect ratio, physical dimensions, pixel density)
+	- Post-processing adjustments (even number rounding, aspect ratio preservation)
+	- Pattern export and visualization
+	- Tile configuration and replication
+	- Color scheme management
 	"""
 	
 	# ============================================================================
@@ -52,105 +89,13 @@ class LedheadExt:
 		"""
 		# The component to which this extension is attached
 		self.ownerComp = ownerComp
-
-		# Create editable property
-		TDF.createProperty(self, 'MyProperty', value=0, dependable=True,
-						   readOnly=False)
-		
-		# Initialize derived state dependencies (read-only, computed properties)
-		self._ScreenResolution = tdu.Dependency((0, 0))
-		self._ScreenAspectRatio = tdu.Dependency('0.00:1')
-		self._ScreenSizeM = tdu.Dependency((0.0, 0.0))
-		self._ScreenSizeFt = tdu.Dependency((0.0, 0.0))
-		self._NativePixelDensity = tdu.Dependency(0.0)
-		self._TileCount = tdu.Dependency(0)
-
-		# Public attributes
-		self.a = 0 # attribute
-		self.B = 1 # promoted attribute
-
-		# Persistent storage items (commented out by default)
-		storedItems = [
-			{'name': 'StoredProperty', 'default': None, 'readOnly': False,
-			 'property': True, 'dependable': True},
-		]
-		# Uncomment below to enable persistent storage
-		# self.stored = StorageManager(self, ownerComp, storedItems)
 		
 		# Initialize derived properties on component load
 		self.UpdateDerivedProperties()
 
-	# ============================================================================
-	# PROPERTIES - DERIVED STATE (READ-ONLY)
-	# ============================================================================
-	
-	@property
-	def ScreenResolution(self):
-		"""
-		Screen resolution in pixels as (width, height) tuple.
-		
-		Calculated as: (Tilesw * Tileresolutionw, Tilesh * Tileresolutionh)
-		
-		Returns:
-			tuple: (width_pixels, height_pixels)
-		"""
-		return self._ScreenResolution.val
-	
-	@property
-	def ScreenAspectRatio(self):
-		"""
-		Screen aspect ratio as formatted string.
-		
-		Format: "X.XX:1" where X.XX is width/height ratio rounded to 2 decimals.
-		
-		Returns:
-			str: Aspect ratio formatted as "X.XX:1"
-		"""
-		return self._ScreenAspectRatio.val
-	
-	@property
-	def ScreenSizeM(self):
-		"""
-		Screen physical dimensions in meters as (width, height) tuple.
-		
-		Returns:
-			tuple: (width_meters, height_meters)
-		"""
-		return self._ScreenSizeM.val
-	
-	@property
-	def ScreenSizeFt(self):
-		"""
-		Screen physical dimensions in feet as (width, height) tuple.
-		
-		Returns:
-			tuple: (width_feet, height_feet)
-		"""
-		return self._ScreenSizeFt.val
-	
-	@property
-	def NativePixelDensity(self):
-		"""
-		Native screen pixel density in PPI (pixels per inch).
-		
-		Calculated as average of width and height PPI.
-		
-		Returns:
-			float: Pixels per inch
-		"""
-		return self._NativePixelDensity.val
-	
-	@property
-	def TileCount(self):
-		"""
-		Total number of tiles in the screen configuration.
-		
-		Calculated as: Tilesw * Tilesh
-		
-		Returns:
-			int: Total tile count
-		"""
-		return self._TileCount.val
+		# Initialize scaling mode on component load
+		scaling_mode = str(parent.Ledhead.par.Scalingmode).lower()
+		self.ApplyScalingMode(scaling_mode, verbose=False)
 
 	# ============================================================================
 	# INTERNAL METHODS - PROPERTY MANAGEMENT
@@ -162,6 +107,7 @@ class LedheadExt:
 		
 		Called automatically during initialization and after scaling changes.
 		Calculates: resolution, aspect ratio, physical sizes, pixel density, tile count.
+		Writes results directly to custom component parameters.
 		
 		Raises:
 			Exception: Caught and logged if parameter access fails.
@@ -175,26 +121,26 @@ class LedheadExt:
 			
 			screen_res_w = tiles_w * tile_res_w
 			screen_res_h = tiles_h * tile_res_h
-			self._ScreenResolution.val = (screen_res_w, screen_res_h)
+			parent.Ledhead.parGroup.Screenresolution = (screen_res_w, screen_res_h)
 			
 			# Calculate aspect ratio
 			aspect_ratio = screen_res_w / screen_res_h if screen_res_h > 0 else 0.0
 			aspect_str = f'{aspect_ratio:.2f}:1'
-			self._ScreenAspectRatio.val = aspect_str
+			parent.Ledhead.par.Screenaspectratio = aspect_str
 			
 			# Get and store physical screen size in meters
 			screen_size_w = (parent.Ledhead.par.Tilesw * parent.Ledhead.par.Tilesizemmw) / self.METER_TO_MM
 			screen_size_h = (parent.Ledhead.par.Tilesh * parent.Ledhead.par.Tilesizemmh) / self.METER_TO_MM
-			self._ScreenSizeM.val = (screen_size_w, screen_size_h)
+			parent.Ledhead.parGroup.Screensizem = (screen_size_w, screen_size_h)
 			
 			# Convert physical size to feet
-			screen_size_ft = (self.ScreenSizeM[0] * self.METER_TO_FT, 
-							  self.ScreenSizeM[1] * self.METER_TO_FT)
-			self._ScreenSizeFt.val = screen_size_ft
+			screen_size_ft = (screen_size_w * self.METER_TO_FT, 
+							  screen_size_h * self.METER_TO_FT)
+			parent.Ledhead.parGroup.Screensizeft = screen_size_ft
 			
 			# Calculate native pixel density in PPI
-			screen_width_inches = self.ScreenSizeM[0] * self.METER_TO_IN
-			screen_height_inches = self.ScreenSizeM[1] * self.METER_TO_IN
+			screen_width_inches = screen_size_w * self.METER_TO_IN
+			screen_height_inches = screen_size_h * self.METER_TO_IN
 			
 			if screen_width_inches > 0 and screen_height_inches > 0:
 				ppi_width = screen_res_w / screen_width_inches
@@ -203,11 +149,11 @@ class LedheadExt:
 			else:
 				native_ppi = 0.0
 			
-			self._NativePixelDensity.val = native_ppi
+			parent.Ledhead.par.Nativepixeldensity = native_ppi
 			
 			# Calculate total tile count
 			tile_count = tiles_w * tiles_h
-			self._TileCount.val = tile_count
+			parent.Ledhead.par.Tilecount = tile_count
 			
 		except Exception as e:
 			print(f'Error updating derived properties: {e}')
@@ -216,7 +162,7 @@ class LedheadExt:
 	# PUBLIC METHODS - SCALING MODES
 	# ============================================================================
 	
-	def ApplyScalingMode(self, mode):
+	def ApplyScalingMode(self, mode, verbose=True, round_to_even=False, preserve_aspect=False):
 		"""
 		Calculate and apply design resolution based on selected scaling mode.
 		
@@ -233,6 +179,9 @@ class LedheadExt:
 		
 		Args:
 			mode (str): Scaling mode name (case-insensitive)
+			verbose (bool): If True, print scaling results to console. Default is True.
+			round_to_even (bool): If True, round dimensions to even numbers. Default is False.
+			preserve_aspect (bool): If True, adjust height to preserve native aspect ratio. Default is False.
 			
 		Returns:
 			tuple: (design_width_pixels, design_height_pixels)
@@ -260,17 +209,66 @@ class LedheadExt:
 			design_res_w = native_res_w
 			design_res_h = native_res_h
 		
+		# Apply post-processing adjustments
+		if round_to_even:
+			design_res_w = self._round_to_even(design_res_w)
+			design_res_h = self._round_to_even(design_res_h)
+		
+		if preserve_aspect:
+			design_res_w, design_res_h = self._preserve_aspect_ratio(
+				design_res_w, design_res_h, native_res_w, native_res_h)
+		
 		# Apply calculated design resolution and update properties
 		parent.Ledhead.parGroup.Screendesignresolution = (design_res_w, design_res_h)
 		self.UpdateDerivedProperties()
 		
-		print(f'Scaling Mode: {mode} | Native: {native_res_w}x{native_res_h} | Design: {design_res_w}x{design_res_h}')
+		if verbose:
+			print(f'Scaling Mode: {mode} | Native: {native_res_w}x{native_res_h} | Design: {design_res_w}x{design_res_h}')
 		
 		return (design_res_w, design_res_h)
 
 	# ============================================================================
 	# PRIVATE METHODS - SCALING CALCULATIONS
 	# ============================================================================
+	
+	def _round_to_even(self, value):
+		"""
+		Round a value to the nearest even number.
+		
+		Args:
+			value (float): Value to round
+			
+		Returns:
+			int: Nearest even integer
+		"""
+		rounded = int(round(value))
+		return rounded if rounded % 2 == 0 else rounded + 1
+	
+	def _preserve_aspect_ratio(self, design_w, design_h, native_w, native_h):
+		"""
+		Adjust design resolution to preserve native aspect ratio.
+		
+		If aspect ratios don't match exactly, adjusts height to preserve width
+		and match the native aspect ratio.
+		
+		Args:
+			design_w (int): Calculated design width
+			design_h (int): Calculated design height
+			native_w (int): Native screen width
+			native_h (int): Native screen height
+			
+		Returns:
+			tuple: (adjusted_width, adjusted_height) with preserved aspect ratio
+		"""
+		native_aspect = native_w / native_h if native_h > 0 else 1.0
+		design_aspect = design_w / design_h if design_h > 0 else 1.0
+		
+		if abs(native_aspect - design_aspect) > 0.001:  # Allow small floating point tolerance
+			# Adjust height to match native aspect ratio
+			adjusted_h = max(int(round(design_w / native_aspect)), 1)
+			return design_w, adjusted_h
+		
+		return design_w, design_h
 	
 	def _calculate_density_scaling(self, native_res_w, native_res_h):
 		"""
@@ -454,15 +452,3 @@ class LedheadExt:
 		"""
 		p = ui.panes.createFloating(type=PaneType.NETWORKEDITOR, name="Output")
 		p.owner = op('container1/button1')
-
-	# ============================================================================
-	# LEGACY / DEPRECATED METHODS
-	# ============================================================================
-	
-	def setDesignRes(self, tile_res_x, tile_res_y):
-		"""
-		Deprecated: Use ApplyScalingMode() instead.
-		
-		This method is retained for backward compatibility but is not implemented.
-		"""
-		pass
