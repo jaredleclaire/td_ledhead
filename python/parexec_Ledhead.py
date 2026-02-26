@@ -15,6 +15,9 @@ def onValueChange(par, prev):
 			parent.Ledhead.ApplyScalingMode(scaling_mode,verbose=False)
 		case 'Tilesw' | 'Tilesh' | 'Tileresolutionw' | 'Tileresolutionh' | 'Tilesizemmw' | 'Tilesizemmh':
 			parent.Ledhead.UpdateDerivedProperties()
+			# Re-apply scaling mode when tile parameters change (which affects native resolution)
+			scaling_mode = str(parent.Ledhead.par.Scalingmode).lower()
+			parent.Ledhead.ApplyScalingMode(scaling_mode, verbose=False)
 		case _:
 			pass
 	
